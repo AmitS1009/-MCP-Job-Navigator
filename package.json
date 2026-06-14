@@ -1,0 +1,10 @@
+{
+  "name": "job-research-agent",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "docker compose up --build",
+    "stop": "docker compose down",
+    "logs": "docker compose logs -f",
+    "eval": "docker compose exec backend python -m app.evaluation.run_evaluation"
+  }
+}

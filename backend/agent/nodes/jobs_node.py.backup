@@ -1,0 +1,21 @@
+from agent.tools.duckduckgo_search import multi_search
+import logging
+
+logger = logging.getLogger(__name__)
+
+async def jobs_node(state: dict) -> dict:
+    logger.info(f"[JOBS NODE] Starting. Company name: {state.get('company_name', 'unknown')}")
+    try:
+        company = state["company_name"]
+        queries = [
+            f"{company} jobs hiring 2026",
+            f"{company} careers open positions",
+            f"{company} software engineer ML engineer job"
+        ]
+        logger.info(f"[JOBS NODE] Generated queries: {queries}")
+        results = await multi_search(queries, count_per_query=3)
+        logger.info(f"[JOBS NODE] Completed. Found {len(results)} results")
+        return {"job_postings": results}
+    except Exception as e:
+        logger.error(f"[JOBS NODE] Error: {e}")
+        return {"job_postings": [], "error": str(e)}

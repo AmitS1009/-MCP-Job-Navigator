@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uvicorn main:app *)",
+      "Bash(python -m app.evaluation.run_evaluation)",
+      "Bash(python3 -m app.evaluation.run_evaluation)",
+      "Bash(pip list *)",
+      "Bash(python3 -c \"import langchain_community.chat_models; print\\(dir\\(langchain_community.chat_models\\)\\)\")",
+      "Bash(python3 *)",
+      "Bash(pip install *)",
+      "Bash(mkdir -p /opt/homebrew/lib/python3.14/site-packages/langchain_community/chat_models/)",
+      "Bash(echo \"from langchain_classic.chat_models.vertexai import ChatVertexAI\")",
+      "Bash(pip show *)",
+      "Bash(docker compose ps *)",
+      "Bash(docker compose logs *)",
+      "Bash(docker compose down *)",
+      "Bash(docker compose up *)",
+      "Bash(docker compose exec *)",
+      "Bash(docker compose run *)",
+      "Bash(docker compose restart *)",
+      "Bash(docker *)",
+      "Bash(curl -s -X POST http://localhost:8000/research -H \"Content-Type: application/json\" -d '{\"query\": \"Google\"}')"
+    ]
+  }
+}

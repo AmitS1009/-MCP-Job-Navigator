@@ -1,0 +1,21 @@
+from agent.tools.duckduckgo_search import multi_search
+import logging
+
+logger = logging.getLogger(__name__)
+
+async def competitor_node(state: dict) -> dict:
+    logger.info(f"[COMPETITOR NODE] Starting. Company name: {state.get('company_name', 'unknown')}")
+    try:
+        company = state["company_name"]
+        queries = [
+            f"{company} top competitors alternatives 2026",
+            f"{company} vs competitors comparison",
+            f"companies similar to {company}"
+        ]
+        logger.info(f"[COMPETITOR NODE] Generated queries: {queries}")
+        results = await multi_search(queries, count_per_query=3)
+        logger.info(f"[COMPETITOR NODE] Completed. Found {len(results)} results")
+        return {"competitors": results}
+    except Exception as e:
+        logger.error(f"[COMPETITOR NODE] Error: {e}")
+        return {"competitors": [], "error": str(e)}

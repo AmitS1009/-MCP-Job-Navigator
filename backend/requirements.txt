@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+duckduckgo-search
+python-dotenv
+langchain==0.2.16
+langgraph
+langchain-groq==0.1.9
+langsmith
+asyncpg
+sqlalchemy[asyncio]
+langchain-core==0.2.41
+langchain-community==0.2.16
+ragas==0.1.21
+datasets

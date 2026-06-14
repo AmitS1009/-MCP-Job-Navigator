@@ -1,0 +1,151 @@
+import logging
+import sys
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger(__name__)
+
+import os
+import uuid
+from uuid import uuid4
+from pathlib import Path
+from ragas import evaluate
+from ragas.metrics import faithfulness, answer_relevancy, context_precision, context_recall
+from ragas.llms import LangchainLLMWrapper
+from langchain_groq import ChatGroq
+from datasets import Dataset
+import json
+
+# Add the backend directory to the path so we can import from agent
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from agent.graph import build_graph
+
+def main():
+    try:
+        # Load GROQ_API_KEY from environment
+        GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+        if not GROQ_API_KEY:
+            raise ValueError("GROQ_API_KEY environment variable not set")
+
+        # Load test_queries.json
+        test_queries_path = Path(__file__).parent / "test_queries.json"
+        with open(test_queries_path, "r") as f:
+            test_queries = json.load(f)
+
+        # Build graph
+        graph = build_graph()
+
+        # Set evaluator LLM
+        evaluator_llm = LangchainLLMWrapper(
+            ChatGroq(model="llama-3.1-8b-instant", api_key=GROQ_API_KEY)
+        )
+
+        dataset_rows = []
+        for i, query_obj in enumerate(test_queries, start=1):
+            question = query_obj["question"]
+            logger.info(f"[EVAL] Query {i}/20: {question}")
+
+            # Initial state
+            initial_state = {
+                "company_name": question,
+                "news_results": [],
+                "job_postings": [],
+                "company_background": [],
+                "competitors": [],
+                "synthesis": "",
+                "error": None,
+                "retry_count": 0,
+                "validation_passed": False,
+                "session_id": str(uuid4())
+            }
+
+            # Run graph
+            result = graph.invoke(initial_state)
+
+            # Extract answer
+            answer = result.get("synthesis", "")
+
+            # Extract contexts
+            contexts = []
+            for item in result.get("news_results", []):
+                if isinstance(item, dict) and "description" in item:
+                    desc = item["description"]
+                    if desc:  # filter out empty strings
+                        contexts.append(desc)
+            for item in result.get("job_postings", []):
+                if isinstance(item, dict) and "description" in item:
+                    desc = item["description"]
+                    if desc:
+                        contexts.append(desc)
+            for item in result.get("company_background", []):
+                if isinstance(item, dict) and "description" in item:
+                    desc = item["description"]
+                    if desc:
+                        contexts.append(desc)
+            for item in result.get("competitors", []):
+                if isinstance(item, dict) and "description" in item:
+                    desc = item["description"]
+                    if desc:
+                        contexts.append(desc)
+
+            # Filter out empty strings (already done above, but double-check)
+            contexts = [ctx for ctx in contexts if ctx]
+
+            if not contexts:
+                contexts = ["No context retrieved"]
+
+            dataset_rows.append({
+                "question": question,
+                "answer": answer,
+                "contexts": contexts
+            })
+
+            logger.info(f"[EVAL] Query {i}/20 complete")
+
+        # Convert to Dataset
+        dataset = Dataset.from_list(dataset_rows)
+
+        logger.info("[EVAL] Running RAGAS evaluation on 20 queries")
+        result = evaluate(
+            dataset,
+            metrics=[faithfulness, answer_relevancy, context_precision, context_recall],
+            llm=evaluator_llm
+        )
+
+        # Extract scores
+        faithfulness_score = float(result["faithfulness"])
+        answer_relevancy_score = float(result["answer_relevancy"])
+        context_precision_score = float(result["context_precision"])
+        context_recall_score = float(result["context_recall"])
+
+        logger.info(f"[EVAL] Faithfulness: {faithfulness_score}")
+        logger.info(f"[EVAL] Answer Relevancy: {answer_relevancy_score}")
+        logger.info(f"[EVAL] Context Precision: {context_precision_score}")
+        logger.info(f"[EVAL] Context Recall: {context_recall_score}")
+
+        # Save scores
+        from datetime import datetime
+        scores_path = Path(__file__).parent / "scores.json"
+        scores_data = {
+            "status": "completed",
+            "faithfulness": faithfulness_score,
+            "answer_relevancy": answer_relevancy_score,
+            "context_precision": context_precision_score,
+            "context_recall": context_recall_score,
+            "evaluated_queries": 20,
+            "judge_model": "llama-3.1-8b-instant",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        with open(scores_path, "w") as f:
+            json.dump(scores_data, f, indent=2)
+
+        logger.info(f"[EVAL] Scores saved to scores.json")
+
+    except Exception as e:
+        logger.error(f"[EVAL] Error: {e}", exc_info=True)
+        raise
+
+if __name__ == "__main__":
+    main()
